@@ -155,6 +155,12 @@ use crate::collections::TryReserveError;
 use crate::slice;
 use crate::vec::{self, AsVecIntoIter, Vec};
 
+use safety::requires;
+
+#[cfg(kani)]
+#[unstable(feature="kani", issue="none")]
+use core::kani;
+
 #[cfg(test)]
 mod tests;
 
@@ -672,11 +678,13 @@ impl<T: Ord, A: Allocator> BinaryHeap<T, A> {
     /// # Safety
     ///
     /// The caller must guarantee that `pos < self.len()`.
+    #[requires(pos < self.len() && start <= pos)]
     unsafe fn sift_up(&mut self, start: usize, pos: usize) -> usize {
         // Take out the value at `pos` and create a hole.
         // SAFETY: The caller guarantees that pos < self.len()
         let mut hole = unsafe { Hole::new(&mut self.data, pos) };
 
+        #[cfg_attr(kani, kani::loop_invariant(hole.pos() <= pos))]
         while hole.pos() > start {
             let parent = (hole.pos() - 1) / 2;
 
@@ -1895,5 +1903,63 @@ impl<'a, T: 'a + Ord + Copy, A: Allocator> Extend<&'a T> for BinaryHeap<T, A> {
     #[inline]
     fn extend_reserve(&mut self, additional: usize) {
         self.reserve(additional);
+    }
+}
+
+#[cfg(kani)]
+#[unstable(feature = "kani", issue = "none")]
+mod verify {
+    use super::*;
+    use crate::boxed::Box;
+
+    /// Generates an arbitrary vector whose length is at most MAX_LENGTH.
+    pub fn any_vec<T, const MAX_LENGTH: usize>() -> Vec<T>
+    where
+        T: kani::Arbitrary,
+    {
+        let real_length: usize = kani::any_where(|sz| *sz <= MAX_LENGTH);
+        match real_length {
+            0 => vec![],
+            exact if exact == MAX_LENGTH => exact_vec::<T, MAX_LENGTH>(),
+            _ => {
+                let mut any_vec = exact_vec::<T, MAX_LENGTH>();
+                any_vec.truncate(real_length);
+                any_vec.shrink_to_fit();
+                assert!(any_vec.capacity() == any_vec.len());
+                any_vec
+            }
+        }
+    }
+
+    /// Generates an arbitrary vector that is exactly EXACT_LENGTH long.
+    pub fn exact_vec<T, const EXACT_LENGTH: usize>() -> Vec<T>
+    where
+        T: kani::Arbitrary,
+    {
+        let boxed_array: Box<[T; EXACT_LENGTH]> = Box::new(kani::any());
+        <[T]>::into_vec(boxed_array)
+    }
+
+    fn any_binary_heap<T: kani::Arbitrary, const MAX_SIZE: usize>() -> BinaryHeap<T> {
+        let data: Vec<T> = any_vec::<T, MAX_SIZE>();
+        BinaryHeap { data }
+    }
+
+    #[kani::proof]
+    pub fn check_any_binary_heap() {
+        let h: BinaryHeap<u8> = any_binary_heap::<u8, 8>();
+        assert!(h.len() <= 8);
+    }
+
+    #[kani::proof]
+    pub fn check_sift_up() {
+        let _ = Box::new(0);
+        const MAX_SIZE: usize = 1000;
+        let mut h: BinaryHeap<u8> = any_binary_heap::<u8, MAX_SIZE>();
+        let pos: usize = kani::any_where(|x| *x < h.len());
+        let start: usize = kani::any_where(|x| *x <= pos);
+        unsafe {
+            h.sift_up(start, pos);
+        }
     }
 }

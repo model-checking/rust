@@ -10,6 +10,7 @@ edition = "2021"
 
 [dependencies]
 core = { path = "../core" }
+safety = { path = "../contracts/safety" }
 compiler_builtins = { version = "0.1.123", features = ['rustc-dep-of-std'] }
 safety = { path = "../contracts/safety" }
 
