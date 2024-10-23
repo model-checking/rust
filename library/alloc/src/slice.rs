@@ -33,6 +33,11 @@ use crate::vec::Vec;
 #[cfg(test)]
 mod tests;
 
+use safety::{requires, ensures};
+
+#[cfg(kani)]
+use core::kani;
+
 #[unstable(feature = "array_chunks", issue = "74985")]
 pub use core::slice::ArrayChunks;
 #[unstable(feature = "array_chunks", issue = "74985")]
@@ -538,12 +543,16 @@ impl<T> [T] {
         // Using `Vec` to access `set_len()`.
         let capacity = self.len().checked_mul(n).expect("capacity overflow");
         let mut buf = Vec::with_capacity(capacity);
+        let old_len = self.len();
 
         // `2^expn` repetition is done by doubling `buf` `expn`-times.
         buf.extend(self);
         {
             let mut m = n >> 1;
             // If `m > 0`, there are remaining bits up to the leftmost '1'.
+            #[cfg_attr(kani, kani::loop_invariant(m <= n >> 1 
+                                                  && (m == 0 || (old_len * (n/(m << 2)) <= buf.len() && buf.len() <= old_len * ((n/(m << 1)) ))
+                                                  && (m != 0 || (old_len * ((n+1)/2) <= buf.len() && buf.len() <= old_len * n)))))]
             while m > 0 {
                 // `buf.extend(buf)`:
                 unsafe {
@@ -891,5 +900,43 @@ impl<T> sort::stable::BufGuard<T> for Vec<T> {
 
     fn as_uninit_slice_mut(&mut self) -> &mut [MaybeUninit<T>] {
         self.spare_capacity_mut()
+    }
+}
+
+#[cfg(kani)]
+#[unstable(feature = "kani", issue = "none")]
+mod verify {
+    use super::*;
+
+    pub fn any_slice_of_array<T, const LENGTH: usize>(arr: &[T; LENGTH]) -> &[T] {
+        let (from, to) = any_range::<LENGTH>();
+        &arr[from..to]
+    }
+
+    /// A mutable version of the previous function
+    pub fn any_slice_of_array_mut<T, const LENGTH: usize>(arr: &mut [T; LENGTH]) -> &mut [T] {
+        let (from, to) = any_range::<LENGTH>();
+        &mut arr[from..to]
+    }
+
+    fn any_range<const LENGTH: usize>() -> (usize, usize) {
+        let from: usize = kani::any();
+        let to: usize = kani::any();
+        kani::assume(to <= LENGTH);
+        kani::assume(from <= to);
+        (from, to)
+    }
+
+    #[kani::proof]
+    pub fn check_repeat() {
+        let _ = Box::new(0);
+        const ARR_SIZE: usize = 1000;
+        const REPEAT_TIMES: usize = 100;
+        let n = kani::any_where(|i| *i < REPEAT_TIMES);
+        let mut x: [u8; ARR_SIZE] = kani::any();
+        let xs = any_slice_of_array_mut(&mut x);
+        unsafe {
+            xs.repeat(n);
+        }
     }
 }
