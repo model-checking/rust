@@ -230,6 +230,7 @@
 #![feature(unboxed_closures)]
 #![feature(unsized_fn_params)]
 #![feature(with_negative_coherence)]
+#![feature(proc_macro_hygiene)]
 // tidy-alphabetical-end
 //
 // Target features:
