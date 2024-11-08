@@ -1137,6 +1137,7 @@ const unsafe fn swap_nonoverlapping_simple_untyped<T>(x: *mut T, y: *mut T, coun
     let x = x.cast::<MaybeUninit<T>>();
     let y = y.cast::<MaybeUninit<T>>();
     let mut i = 0;
+    #[safety::loop_invariant(i <= count)]
     while i < count {
         // SAFETY: By precondition, `i` is in-bounds because it's below `n`
         let x = unsafe { x.add(i) };
@@ -2585,5 +2586,18 @@ mod verify {
         let x = kani::any::<usize>();
         let m = kani::any::<usize>();
         unsafe { mod_inv_copy(x, m) };
+    }
+
+    #[kani::proof]
+    pub fn check_swap_nonoverlapping_simple_untyped_slice_ptr() {
+        const ARR_SIZE: usize = (2 << 32) -1;
+        let mut x: [u8; ARR_SIZE] = kani::any();
+        let mut xs = kani::slice::any_slice_of_array_mut(&mut x);
+        let mut y: [u8; ARR_SIZE] = kani::any();
+        let mut ys = kani::slice::any_slice_of_array_mut(&mut y);
+        let s: usize = kani::any_where(|v| *v <= xs.len() && *v <= ys.len());
+        unsafe {
+            swap_nonoverlapping_simple_untyped(xs.as_mut_ptr(), ys.as_mut_ptr(), s);
+        }
     }
 }
