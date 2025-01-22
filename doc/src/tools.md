@@ -12,6 +12,7 @@ please see the [Tool Application](general-rules.md#tool-applications) section.
 | Tool                | CI Status |
 |---------------------|-------|
  | Kani Rust Verifier  | [![Kani](https://github.com/model-checking/verify-rust-std/actions/workflows/kani.yml/badge.svg)](https://github.com/model-checking/verify-rust-std/actions/workflows/kani.yml)      |
+ | VeriFast for Rust   | [![VeriFast](https://github.com/model-checking/verify-rust-std/actions/workflows/verifast.yml/badge.svg)](https://github.com/model-checking/verify-rust-std/actions/workflows/verifast.yml)      |
 
 
 
