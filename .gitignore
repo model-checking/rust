@@ -48,6 +48,8 @@ package-lock.json
 ## Kani
 *.out
 
+## GOTO-Transcoder
+goto-transcoder
 # Added by cargo
 #
 # already existing elements were commented out
